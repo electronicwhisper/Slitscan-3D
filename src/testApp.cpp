@@ -4,12 +4,13 @@
 void testApp::setup(){
 	ofBackground(255,255,255);
 	
-	start = 0;
-	end = 1;
+	x1 = -1;
+	t1 = 0;
+	x2 = 1;
+	t2 = 0;
 	
-	rotation = 0;
 	
-	moveInc = 0.05;
+	increment = 0.05;
 
 	movie.loadMovie("movies/MVI_1150.AVI");
 	width = movie.getWidth();
@@ -18,7 +19,17 @@ void testApp::setup(){
 	
 	//unsigned char wholeMovie[frames * width * height * 3];
 	
-	loaded = false;
+	for (int frame = 0; frame < frames; frame++) {
+		movie.setFrame(frame);
+		unsigned char * pixels = movie.getPixels();
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				for (int color = 0; color < 3; color++) {
+					wholeMovie[(frame * (int) width * (int) height + y * (int) width + x) * 3 + color] = pixels[(y * (int) width + x) * 3 + color];
+				}
+			}
+		}
+	}
 	
 	img.allocate(width, height, OF_IMAGE_COLOR);
 }
@@ -31,105 +42,97 @@ void testApp::update(){
 //--------------------------------------------------------------
 void testApp::draw(){
 	
-	if (!loaded) {
-		for (int frame = 0; frame < frames; frame++) {
-			movie.setFrame(frame);
-			unsigned char * pixels = movie.getPixels();
-			for (int y = 0; y < height; y++) {
-				for (int x = 0; x < width; x++) {
-					for (int color = 0; color < 3; color++) {
-						wholeMovie[(frame * width * height + y * width + x) * 3 + color] = pixels[(y * width + x) * 3 + color];
-					}
-				}
-			}
-		}		
-	}
 	
-	loaded = true;
-
-	ofSetColor(0xFFFFFF);
+	ofSetColor(0x000000);
+	ofNoFill();
 	
-	unsigned char dest[width * height * 3];
+	// Draw X-Time Graph
+	ofRect(0, 0, 200, 200);	
+	ofLine((x1+1)*100, (-t1+1)*100, (x2+1)*100, (-t2+1)*100);
 	
-//	for (int x = 0; x < width; x++) {
-//		int frame = ofMap((float) x/(float) width, 0, 1, start, end, true) * (float) movie.nFrames;
-//		movie.setFrame(frame);
-//		unsigned char * pixels = movie.getPixels();
-//		for (int y = 0; y < height; y++) {
-//			int r = pixels[(y * width + x) * 3 ];
-//			int g = pixels[(y * width + x) * 3 + 1];
-//			int b = pixels[(y * width + x) * 3 + 2];
-//			dest[(y * width + x) * 3] = r;
-//			dest[(y * width + x) * 3 + 1] = g;
-//			dest[(y * width + x) * 3 + 2] = b;
-//		}
-//	}
+	// Draw Instructions
+	ofDrawBitmapString("UP: zoom in\nDOWN: zoom out\nLEFT: pan left\nRIGHT: pan right\nZ: rotate left\nX: rotate right", 20, 220);
 	
-//	for (int x = 0; x < width; x++) {
-//		int frame = ofMap((float) x/(float) width, 0, 1, start, end, true) * (float) movie.nFrames;
-//		for (int y = 0; y < height; y++) {
-//			int r = wholeMovie[(frame * width * height + y * width + x) * 3];
-//			int g = wholeMovie[(frame * width * height + y * width + x) * 3 + 1];
-//			int b = wholeMovie[(frame * width * height + y * width + x) * 3 + 2];
-//			dest[(y * width + x) * 3] = r;
-//			dest[(y * width + x) * 3 + 1] = g;
-//			dest[(y * width + x) * 3 + 2] = b;
-//		}
-//	}
 	
-	for (int x = 0; x < width; x++) {
-		int frame = ofMap(x, 0, width, 0, frames - 1, true);
-		int srcx = ofMap(rotation, 0.0, 1.0, 0, width, true);
+	
+	// Draw image
+	
+	unsigned char dest[(int) width * (int) height * 3]; // destination image
+	
+	for (int destx = 0; destx < width; destx++) {
+		int srcx = ofMap(destx, 0, width, (x1+1)*(width-1)/2, (x2+1)*(width-1)/2, true);
+		int srcframe = ofMap(destx, 0, width, (t1+1)*(frames-1)/2, (t2+1)*(frames-1)/2, true);
 		for (int y = 0; y < height; y++) {
-			int r = wholeMovie[(frame * width * height + y * width + srcx) * 3];
-			int g = wholeMovie[(frame * width * height + y * width + srcx) * 3 + 1];
-			int b = wholeMovie[(frame * width * height + y * width + srcx) * 3 + 2];
-			dest[(y * width + x) * 3] = r;
-			dest[(y * width + x) * 3 + 1] = g;
-			dest[(y * width + x) * 3 + 2] = b;
+			for (int color = 0; color < 3; color++) {
+				dest[(y * (int) width + destx) * 3 + color] = wholeMovie[(srcframe * (int) width * (int) height + y * (int) width + srcx) * 3 + color];
+			}
 		}
-		
 	}
 	
 	img.setFromPixels(dest, width, height, OF_IMAGE_COLOR, true);
-	
 	ofSetColor(0xFFFFFF);
-	img.draw(20, 20);
+	img.draw(220, 20);
 
 
 }
 
 //--------------------------------------------------------------
 void testApp::keyPressed  (int key){
-    switch(key){
+	switch (key) {
 		case OF_KEY_UP:
-			start += moveInc;
-			end -= moveInc;
-		break;
+			// zoom in
+			if (x1 == -1 && x2 == 1) {
+				t1 = ofClamp(t1 + increment, -1, 1);
+				t2 = ofClamp(t2 - increment, -1, 1);
+			} else if (t1 == -1 && t2 == 1) {
+				x1 = ofClamp(x1 - increment, -1, 1);
+				x2 = ofClamp(x2 + increment, -1, 1);
+			}
+			break;
 		case OF_KEY_DOWN:
-			start -= moveInc;
-			end += moveInc;
-		break;
-        case OF_KEY_LEFT:
-            start -= moveInc;
-			end -= moveInc;
-			
-        break;
-        case OF_KEY_RIGHT:
-            start += moveInc;
-			end += moveInc;
-			
-        break;
+			// zoom out
+			if (t1 == -1 && t2 == 1) {
+				x1 = ofClamp(x1 + increment, -1, 1);
+				x2 = ofClamp(x2 - increment, -1, 1);
+				if (x1 > x2) {
+					float middle = (x1 + x2) / 2;
+					x1 = middle;
+					x2 = middle;
+				}
+			} else if (x1 == -1 && x2 == 1) {
+				t1 = ofClamp(t1 - increment, -1, 1);
+				t2 = ofClamp(t2 + increment, -1, 1);
+			}
+			break;
+		case OF_KEY_LEFT:
+			// pan left
+			if (x1 == -1 && x2 == 1) {
+				t1 = ofClamp(t1 - increment, -1, 1);
+				t2 = ofClamp(t2 - increment, -1, 1);
+			}
+			break;
+		case OF_KEY_RIGHT:
+			// pan right
+			if (x1 == -1 && x2 == 1) {
+				t1 = ofClamp(t1 + increment, -1, 1);
+				t2 = ofClamp(t2 + increment, -1, 1);
+			}
+			break;
 		case 'z':
-			rotation -= moveInc;
-		break;
+			// rotate left
+			if (t1 == -1 && t2 == 1) {
+				x1 = ofClamp(x1 - increment, -1, 1);
+				x2 = ofClamp(x2 - increment, -1, 1);
+			}
+			break;
 		case 'x':
-			rotation += moveInc;
-		break;
-    }
-	start = ofClamp(start, 0, 1);
-	end = ofClamp(end, 0, 1);
-	rotation = ofClamp(rotation, 0, 1);
+			// rotate right
+			if (t1 == -1 && t2 == 1) {
+				x1 = ofClamp(x1 + increment, -1, 1);
+				x2 = ofClamp(x2 + increment, -1, 1);
+			}
+			break;
+	}
 }
 
 //--------------------------------------------------------------
